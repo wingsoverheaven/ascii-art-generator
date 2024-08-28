@@ -70,16 +70,17 @@
             line-height: 1.2;
             overflow: auto;
             background-color: white;
-            color: #333;
+            color: #000000;
             padding: 10px;
             border-radius: 5px;
             margin-top: 20px;
             width: 100%;
             box-sizing: border-box;
+            min-height: 137px;
         }
         body.dark-theme #output {
-            background-color: #222;
-            color: #f0f0f0;
+            background-color: #000000;
+            color: #ffffff;
         }
         #width-input {
             margin-top: 10px;
@@ -115,33 +116,100 @@
             color: #333;
         }
         #theme-toggle {
-        position: absolute;
-        top: 20px;
-        right: 20px;
-        background-color: #f0f0f0;
-        color: #333;
-        border: none;
-        border-radius: 5px;
-        padding: 10px 20px;
-        cursor: pointer;
-        transition: background-color 0.3s, color 0.3s;
-        font-size: 21px;
-        font-weight: bold;
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background-color: #f0f0f000;
+            color: #333;
+            border: none;
+            border-radius: 5px;
+            padding: 10px 20px;
+            cursor: pointer;
+            transition: background-color 0.3s, color 0.3s;
+            font-size: 21px;
+            font-weight: bold;
         }
-
         body.dark-theme #theme-toggle {
-            background-color: #333;
+            background-color: #33333300;
             color: #f0f0f0;
         }
-
         #theme-toggle:hover {
-            transform: scale(1.05);  /* Added slight scale effect on hover */
+            transform: scale(1.05);
+        }
+        #color-toggle {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-top: 10px;
+        }
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+            margin-left: 10px;
+        }
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #f0f0f0;
+            transition: .4s;
+            border-radius: 34px;
+            border: 1px solid #333;
+  
+        }
+        body.dark-theme .slider {
+            background-color: #f0f0f0;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 25px;
+            width: 25px;
+            left: 4px;
+            bottom: 4px;
+            background-color: #333;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .slider {
+            background-color: #f0f0f0;
+        }
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+        #color-mode-text {
+            transition: color 0.3s;
+        }
+        #color-mode-text.rainbow {
+            background-image: linear-gradient(to left, violet, indigo, blue, green, yellow, orange, red);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: rainbow_animation 6s ease-in-out infinite;
+            background-size: 400% 100%;
+        }
+        @keyframes rainbow_animation {
+            0%,100% {
+                background-position: 0 0;
+            }
+            50% {
+                background-position: 100% 0;
+            }
         }
     </style>
 </head>
-<body>
+<body class="dark-theme">
     <h1>ASCII Art Generator</h1>
-    <button id="theme-toggle">🌞</button>
+    <button id="theme-toggle">🌙</button>
     <div id="dropzone-container">
         <div id="dropzone">
             <span id="dropzone-text">Drop an image here or click to upload</span>
@@ -152,9 +220,17 @@
         <label for="output-width">Output Width:</label>
         <input type="number" id="output-width" value="320" min="1" max="1000000">
     </div>
+    <div id="color-toggle">
+        <label for="color-mode"><span id="color-mode-text" class="rainbow">Color Mode:</span></label>
+        <label class="switch">
+            <input type="checkbox" id="color-mode" checked>
+            <span class="slider"></span>
+        </label>
+    </div>
     <div id="output"></div>
     <button id="copy-button" style="display: none;">Copy to Clipboard</button>
 
+    <script src="https://cdn.jsdelivr.net/npm/ansi_up@5.0.1/ansi_up.min.js"></script>
     <script src="ascii_generator.js"></script>
     <script>
         let wasmModule;
@@ -172,6 +248,8 @@
         const outputWidthInput = document.getElementById('output-width');
         const copyButton = document.getElementById('copy-button');
         const themeToggle = document.getElementById('theme-toggle');
+        const colorModeToggle = document.getElementById('color-mode');
+        const colorModeText = document.getElementById('color-mode-text');
 
         dropzone.addEventListener('click', () => {
             const input = document.createElement('input');
@@ -210,11 +288,9 @@
                         previewImage.style.display = 'block';
                         dropzoneText.style.display = 'none';
 
-                        // Calculate 50% of the original image size
                         const scaledWidth = Math.round(img.width * 0.5);
                         const scaledHeight = Math.round(img.height * 0.5);
 
-                        // Resize dropzone to match 50% of the image dimensions
                         dropzone.style.width = scaledWidth + 'px';
                         dropzone.style.height = scaledHeight + 'px';
 
@@ -248,43 +324,43 @@
             const asciiPtr = wasmModule.ccall(
                 'generate_ascii_wasm',
                 'number',
-                ['number', 'number', 'number', 'number', 'number'],
-                [imagePtr, width, height, channels, outputWidth]
+                ['number', 'number', 'number', 'number', 'number', 'number'],
+                [imagePtr, width, height, channels, outputWidth, colorModeToggle.checked ? 1 : 0]
             );
 
             const asciiArt = wasmModule.UTF8ToString(asciiPtr);
-            output.textContent = asciiArt;
 
-            // Adjust font size to fit the desired width
+            if (colorModeToggle.checked) {
+                const ansiUp = new AnsiUp();
+                output.innerHTML = ansiUp.ansi_to_html(asciiArt);
+            } else {
+                output.textContent = asciiArt;
+            }
+
             adjustFontSize();
 
             wasmModule._free(imagePtr);
             wasmModule._free(asciiPtr);
 
-            // Show the copy button
             copyButton.style.display = 'block';
         }
 
         function adjustFontSize() {
             const desiredWidth = parseInt(outputWidthInput.value, 10);
             const containerWidth = output.offsetWidth;
-            
-            // Start with a small font size
+
             let fontSize = 1;
             output.style.fontSize = `${fontSize}px`;
-            
-            // Increase font size until the content width exceeds the container width
+
             while (output.scrollWidth <= containerWidth && fontSize < 20) {
                 fontSize++;
                 output.style.fontSize = `${fontSize}px`;
             }
-            
-            // Decrease font size by 1 to ensure it fits
+
             fontSize--;
             output.style.fontSize = `${fontSize}px`;
         }
 
-        // Update ASCII art when output width changes
         outputWidthInput.addEventListener('change', () => {
             const img = document.querySelector('#preview-image');
             if (img.src) {
@@ -298,7 +374,20 @@
             }
         });
 
-        // Copy to clipboard functionality
+        colorModeToggle.addEventListener('change', () => {
+            const img = document.querySelector('#preview-image');
+            if (img.src) {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                canvas.width = img.naturalWidth;
+                canvas.height = img.naturalHeight;
+                ctx.drawImage(img, 0, 0);
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                generateASCII(imageData);
+            }
+            colorModeText.classList.toggle('rainbow', colorModeToggle.checked);
+        });
+
         copyButton.addEventListener('click', () => {
             const asciiArt = output.textContent;
             navigator.clipboard.writeText(asciiArt).then(() => {
@@ -309,11 +398,13 @@
             });
         });
 
-        // Theme toggle functionality
         themeToggle.addEventListener('click', () => {
             document.body.classList.toggle('dark-theme');
-            themeToggle.textContent = document.body.classList.contains('dark-theme') ? '🌙' : '🌞' ;
+            themeToggle.textContent = document.body.classList.contains('dark-theme') ? '🌙' : '🌞';
         });
+
+        // Initialize color mode
+        colorModeText.classList.add('rainbow');
     </script>
 </body>
 </html>
